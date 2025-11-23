@@ -1,0 +1,128 @@
+import FreeCAD as App
+import Part
+import Draft
+import Sketcher
+
+# Create a new document
+doc = App.ActiveDocument
+if doc is None:
+    doc = App.newDocument("DiceFaceDemo")
+
+# Create a cube (20mm sides for a good dice size)
+dice_size = 20.0
+cube = doc.addObject("Part::Box", "Dice")
+cube.Length = dice_size
+cube.Width = dice_size
+cube.Height = dice_size
+# Center the cube at the origin
+cube.Placement = App.Placement(App.Vector(-dice_size/2, -dice_size/2, -dice_size/2), App.Rotation())
+doc.recompute()
+
+# Get all faces of the cube
+shape = cube.Shape
+faces = shape.Faces
+
+print(f"Total number of faces: {len(faces)}")
+
+# Create sketches on each face with the face number
+for i, face in enumerate(faces):
+    # Get the face center for positioning
+    center = face.CenterOfMass
+    
+    # Get the face normal to determine orientation
+    normal = face.normalAt(0, 0)
+    
+    print(f"\nFace {i}:")
+    print(f"  Center: ({center.x:.2f}, {center.y:.2f}, {center.z:.2f})")
+    print(f"  Normal: ({normal.x:.2f}, {normal.y:.2f}, {normal.z:.2f})")
+    
+    # Create a sketch attached to this face
+    sketch = doc.addObject('Sketcher::SketchObject', f'Face_{i}_Sketch')
+    sketch.MapMode = 'FlatFace'
+    sketch.AttachmentSupport = [(cube, f'Face{i+1}')]  # FreeCAD uses 1-based indexing for face names
+    doc.recompute()
+    
+    # OPTION 4: Geometric Analysis - Using sketch's actual placement
+    # After attachment, the sketch has a placement that defines its coordinate system
+    sketch_placement = sketch.Placement
+    
+    # Get the sketch's local X and Y axes in global coordinates
+    # The placement's rotation defines how local axes map to global
+    sketch_x_axis = sketch_placement.Rotation.multVec(App.Vector(1, 0, 0))
+    sketch_y_axis = sketch_placement.Rotation.multVec(App.Vector(0, 1, 0))
+    
+    print(f"  Sketch X axis (global): ({sketch_x_axis.x:.2f}, {sketch_x_axis.y:.2f}, {sketch_x_axis.z:.2f})")
+    print(f"  Sketch Y axis (global): ({sketch_y_axis.x:.2f}, {sketch_y_axis.y:.2f}, {sketch_y_axis.z:.2f})")
+    
+    # Get the sketch origin in global coordinates
+    sketch_origin = sketch_placement.Base
+    
+    # Calculate vector from sketch origin to face center
+    origin_to_center = center - sketch_origin
+    
+    # Project this vector onto the sketch's local axes
+    # This tells us how far to move in sketch coordinates to reach the center
+    proj_x = origin_to_center.dot(sketch_x_axis)
+    proj_y = origin_to_center.dot(sketch_y_axis)
+    
+    print(f"  Sketch origin: ({sketch_origin.x:.2f}, {sketch_origin.y:.2f}, {sketch_origin.z:.2f})")
+    print(f"  Vector to center: ({origin_to_center.x:.2f}, {origin_to_center.y:.2f}, {origin_to_center.z:.2f})")
+    print(f"  Projection X: {proj_x:.2f}, Y: {proj_y:.2f}")
+    
+    # The offset is simply the projection (how far to move in each local axis)
+    offset_x = proj_x
+    offset_y = proj_y
+    
+    print(f"  Calculated Offset: ({offset_x:.2f}, {offset_y:.2f})")
+    
+    sketch.AttachmentOffset = App.Placement(App.Vector(offset_x, offset_y, 0), App.Rotation())
+    doc.recompute()
+    
+    # Add text to the sketch showing the face number
+    # Draw geometry at origin of sketch (which is now centered on the face)
+    sketch.addGeometry(Part.Circle(App.Vector(0, 0, 0), App.Vector(0, 0, 1), 3.0), False)
+    
+    # Add smaller circles inside to represent the face number visually
+    # This creates a pattern similar to dice dots
+    if i == 0:  # 1 dot
+        sketch.addGeometry(Part.Circle(App.Vector(0, 0, 0), App.Vector(0, 0, 1), 0.8), False)
+    elif i == 1:  # 2 dots
+        sketch.addGeometry(Part.Circle(App.Vector(-1.5, 0, 0), App.Vector(0, 0, 1), 0.6), False)
+        sketch.addGeometry(Part.Circle(App.Vector(1.5, 0, 0), App.Vector(0, 0, 1), 0.6), False)
+    elif i == 2:  # 3 dots
+        sketch.addGeometry(Part.Circle(App.Vector(-1.5, 1, 0), App.Vector(0, 0, 1), 0.5), False)
+        sketch.addGeometry(Part.Circle(App.Vector(0, 0, 0), App.Vector(0, 0, 1), 0.5), False)
+        sketch.addGeometry(Part.Circle(App.Vector(1.5, -1, 0), App.Vector(0, 0, 1), 0.5), False)
+    elif i == 3:  # 4 dots
+        sketch.addGeometry(Part.Circle(App.Vector(-1.5, 1.5, 0), App.Vector(0, 0, 1), 0.5), False)
+        sketch.addGeometry(Part.Circle(App.Vector(1.5, 1.5, 0), App.Vector(0, 0, 1), 0.5), False)
+        sketch.addGeometry(Part.Circle(App.Vector(-1.5, -1.5, 0), App.Vector(0, 0, 1), 0.5), False)
+        sketch.addGeometry(Part.Circle(App.Vector(1.5, -1.5, 0), App.Vector(0, 0, 1), 0.5), False)
+    elif i == 4:  # 5 dots
+        sketch.addGeometry(Part.Circle(App.Vector(-1.5, 1.5, 0), App.Vector(0, 0, 1), 0.5), False)
+        sketch.addGeometry(Part.Circle(App.Vector(1.5, 1.5, 0), App.Vector(0, 0, 1), 0.5), False)
+        sketch.addGeometry(Part.Circle(App.Vector(0, 0, 0), App.Vector(0, 0, 1), 0.5), False)
+        sketch.addGeometry(Part.Circle(App.Vector(-1.5, -1.5, 0), App.Vector(0, 0, 1), 0.5), False)
+        sketch.addGeometry(Part.Circle(App.Vector(1.5, -1.5, 0), App.Vector(0, 0, 1), 0.5), False)
+    elif i == 5:  # 6 dots
+        sketch.addGeometry(Part.Circle(App.Vector(-1.5, 1.5, 0), App.Vector(0, 0, 1), 0.5), False)
+        sketch.addGeometry(Part.Circle(App.Vector(1.5, 1.5, 0), App.Vector(0, 0, 1), 0.5), False)
+        sketch.addGeometry(Part.Circle(App.Vector(-1.5, 0, 0), App.Vector(0, 0, 1), 0.5), False)
+        sketch.addGeometry(Part.Circle(App.Vector(1.5, 0, 0), App.Vector(0, 0, 1), 0.5), False)
+        sketch.addGeometry(Part.Circle(App.Vector(-1.5, -1.5, 0), App.Vector(0, 0, 1), 0.5), False)
+        sketch.addGeometry(Part.Circle(App.Vector(1.5, -1.5, 0), App.Vector(0, 0, 1), 0.5), False)
+
+doc.recompute()
+
+print("\n" + "="*50)
+print("Macro completed!")
+print("Each face now has a sketch showing:")
+print("- Face 0: 1 dot")
+print("- Face 1: 2 dots")
+print("- Face 2: 3 dots")
+print("- Face 3: 4 dots")
+print("- Face 4: 5 dots")
+print("- Face 5: 6 dots")
+print("\nYou can now see how FreeCAD numbers the faces.")
+print("Check the console output above for face positions.")
+print("="*50)
